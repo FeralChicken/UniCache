@@ -51,7 +51,7 @@ public class UCPlatformSwitchWindow : EditorWindow
 			}
 			else
 			{
-				UCSwitcher.SwitchToBuildTarget(m_SelectedBuildTarget);
+				UniCache.SwitchToBuildTarget(m_SelectedBuildTarget);
 			}
 
 		}
