@@ -1,8 +1,11 @@
-﻿using UnityEngine;
+//-------------------------------------------------------------------------------------
+// UniCache - Fast Build Target switching for Unity3D
+// Copyright (c) 2014 FanDabbieDozie Studios
+//-------------------------------------------------------------------------------------
+
+using UnityEngine;
 using UnityEditor;
-using System;
 using System.IO;
-using System.Collections;
 using System.Collections.Generic;
 
 namespace UniCache
@@ -10,9 +13,9 @@ namespace UniCache
 //-------------------------------------------------------------------------------------
 public class UniCache 
 {
-	private static string[] UNITY_SUPPORTED_TEXTURE_FORMATS = { "*.png", "*.jpg", "*.jpeg", "*.rgb", "*.tga", "*.targa", ".gif", "*.tiff", "*.tif", "*.bmp", "*.iff", "*.pict", "*.psd" };
-	private static string [] UNITY_SUPPORTED_MESH_FORMATS = { "*.mtl", "*.obj", "*.blend", "*.fbm", "*.fbx", "*.3ds", "*.mb", "*.ma", "*.max", "*.c4d", "*.collada", "*.dxf" };
-	private static string[] UNITY_SUPPORTED_AUDIO_FORMATS = { "*.wav" };
+	private static string[] UNITY_SUPPORTED_TEXTURE_FORMATS = { "*.png", "*.jpg", "*.jpeg", "*.rgb", "*.tga", "*.targa", ".gif", "*.tiff", "*.tif", "*.bmp", "*.iff", "*.pict", "*.psd", "*.exr" };
+	private static string[] UNITY_SUPPORTED_MESH_FORMATS = { "*.mtl", "*.obj", "*.blend", "*.fbm", "*.fbx", "*.3ds", "*.mb", "*.ma", "*.max", "*.c4d", "*.collada", "*.dxf" };
+	private static string[] UNITY_SUPPORTED_AUDIO_FORMATS = { "*.wav", "*.mp3", "*.aif", "*.aiff", "*.ogg" };
 
 	//*********************************************************************************
 	public static bool SwitchToBuildTarget(BuildTarget new_build_target)
@@ -39,7 +42,7 @@ public class UniCache
 		FillBuildTargetFromCache(unity_metadata_root, new_build_target);
 		
 		EditorUserBuildSettings.SwitchActiveBuildTarget(new_build_target);
-
+		
 		return true;
 	}
 
@@ -104,7 +107,7 @@ public class UniCache
 			{
 				Directory.CreateDirectory(uc_cache_root);
 			}
-			catch (Exception e)
+			catch (System.Exception e)
 			{
 				Debug.LogError("UniCache: Couldn't create cache directory: " + uc_cache_root + "\nError: " + e.ToString());
 				return false;
@@ -155,6 +158,8 @@ public class UniCache
 			++curr_file_index;
 		}
 
+		EditorUtility.ClearProgressBar();
+
 		return true;
 	}
 
@@ -203,6 +208,8 @@ public class UniCache
 					(float)curr_file_index / (float)platform_cached_assets.Count);
 			++curr_file_index;
 		}
+
+		EditorUtility.ClearProgressBar();
 	}
 }
 

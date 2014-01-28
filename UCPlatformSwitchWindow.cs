@@ -1,8 +1,11 @@
-﻿using UnityEngine;
+//-------------------------------------------------------------------------------------
+// UniCache - Fast Build Target switching for Unity3D
+// Copyright (c) 2014 FanDabbieDozie Studios
+//-------------------------------------------------------------------------------------
+
+using UnityEngine;
 using UnityEditor;
 using System;
-using System.Collections;
-using System.Collections.Generic;
 
 namespace UniCache
 {
