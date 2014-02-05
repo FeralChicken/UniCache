@@ -5,6 +5,7 @@
 
 using UnityEngine;
 using UnityEditor;
+using System;
 using System.IO;
 using System.Collections.Generic;
 
@@ -19,6 +20,8 @@ namespace UniCache
 		private static string[] UNITY_SUPPORTED_TEXTURE_FORMATS = { "*.png", "*.jpg", "*.jpeg", "*.rgb", "*.tga", "*.targa", ".gif", "*.tiff", "*.tif", "*.bmp", "*.iff", "*.pict", "*.psd", "*.exr" };
 		private static string[] UNITY_SUPPORTED_MESH_FORMATS = { "*.mtl", "*.obj", "*.blend", "*.fbm", "*.fbx", "*.3ds", "*.mb", "*.ma", "*.max", "*.c4d", "*.collada", "*.dxf" };
 		private static string[] UNITY_SUPPORTED_AUDIO_FORMATS = { "*.wav", "*.mp3", "*.aif", "*.aiff", "*.ogg" };
+
+		private static string CACHE_TIMESTAMP_FILENAME = ".uctimestamp";
 
 		//*****************************************************************************
 		public static bool SwitchToBuildTarget(BuildTarget new_build_target)
@@ -64,7 +67,27 @@ namespace UniCache
 				info_dict[relative_filename] = new FileInfo(file);
 			}
 
+			// If our cache timestamp file exists, then it will have been found in this trawl.
+			// It'll just complicate things if it's in here though, so remove it now.
+			info_dict.Remove(CACHE_TIMESTAMP_FILENAME);
 			return info_dict;
+		}
+
+		//*****************************************************************************
+		private static HashSet<string> BuildFileListHashSet(string root_directory)
+		{
+			HashSet<string> file_hashset = new HashSet<string>();
+			string[] found_files = Directory.GetFiles(root_directory, "*", SearchOption.AllDirectories);
+			for(int i = 0; i < found_files.Length; ++i)
+			{
+				string relative_filename = found_files[i].Substring(root_directory.Length + 1);
+				file_hashset.Add(relative_filename);
+			}	
+			
+			// If our cache timestamp file exists, then it will have been found in this trawl.
+			// It'll just complicate things if it's in here though, so remove it now.
+			file_hashset.Remove(CACHE_TIMESTAMP_FILENAME);
+			return file_hashset;
 		}
 
 		//*****************************************************************************
@@ -98,16 +121,24 @@ namespace UniCache
 		}
 
 		//*****************************************************************************
+		private static string GetUCCacheRoot(BuildTarget build_target)
+		{
+			string uc_cache_root = Path.Combine(Application.dataPath, "../UniCacheData/" + build_target.ToString());
+			return Path.GetFullPath(uc_cache_root);
+		}
+
+		//*****************************************************************************
 		// Before switching targets, we want to cache all of the current Unity metadata files
 		// under <project>/Library in our own platform-specific directory structure.
 		private static bool CacheCurrentBuildTarget(string unity_metadata_root)
 		{
+			UCDebug.Log("Caching current build target: " + EditorUserBuildSettings.activeBuildTarget);
+
 			// Now, work out the root path of where we're going to cache our data, based on the *current* build target
 			// This directory might not exist yet if this is the first time that the user has switched away from
 			// this platform.
-			string uc_cache_root = Path.Combine(Application.dataPath, "../UniCacheData/" + EditorUserBuildSettings.activeBuildTarget.ToString());
-			uc_cache_root = Path.GetFullPath(uc_cache_root);
-			if (!Directory.Exists(uc_cache_root))
+			string uc_cache_root = GetUCCacheRoot(EditorUserBuildSettings.activeBuildTarget);
+			if(!Directory.Exists(uc_cache_root))
 			{
 				try
 				{
@@ -120,7 +151,22 @@ namespace UniCache
 				}
 			}
 
-			Dictionary<string, FileInfo> platform_cached_assets = BuildFileInfoDict(uc_cache_root);
+			// If we've ever cached this platform before, then there will be a ".uctimestamp" file
+			// in the cache root. This is an empty file, but we can use its timestamp to figure out
+			// when we last cached the platform, and hence which project assets are stale in this cache.
+			string cache_timestamp_path = Path.Combine(uc_cache_root, ".uctimestamp");
+			DateTime cache_timestamp = DateTime.MinValue;
+			FileInfo cache_timestamp_fileinfo = new FileInfo(cache_timestamp_path);
+			if(cache_timestamp_fileinfo.Exists)
+			{
+				cache_timestamp = cache_timestamp_fileinfo.LastWriteTimeUtc;
+			}
+			else
+			{
+				cache_timestamp_fileinfo.Create();
+			}
+
+			HashSet<string> platform_cached_assets = BuildFileListHashSet(uc_cache_root);
 			List<string> project_assets = CollectProjectAssets();
 			int curr_file_index = 0;
 			foreach(string project_asset in project_assets)
@@ -135,12 +181,12 @@ namespace UniCache
 				string source_cache_filepath = Path.GetFullPath(Path.Combine(unity_metadata_root, relative_guid_filepath));
 				string dest_cache_filepath = Path.GetFullPath(Path.Combine(uc_cache_root, relative_guid_filepath));
 
-				if(platform_cached_assets.ContainsKey(relative_guid_filepath))
+				if(platform_cached_assets.Contains(relative_guid_filepath))
 				{
 					// The platform cache already contains this file. We only need to copy over it if
 					// the asset it references has changed since we last cached this platform.
 					FileInfo asset_fileinfo = new FileInfo(project_asset);
-					if(asset_fileinfo.LastWriteTimeUtc > platform_cached_assets[relative_guid_filepath].LastWriteTimeUtc)
+					if(asset_fileinfo.LastWriteTimeUtc > cache_timestamp)
 					{
 						UCDebug.Log("Overwriting cached file: " + asset_relative_path);
 						File.Copy(source_cache_filepath, dest_cache_filepath, true);
@@ -164,6 +210,8 @@ namespace UniCache
 				++curr_file_index;
 			}
 
+			cache_timestamp_fileinfo.LastWriteTimeUtc = DateTime.UtcNow;
+
 			EditorUtility.ClearProgressBar();
 
 			return true;
@@ -172,9 +220,9 @@ namespace UniCache
 		//*****************************************************************************
 		private static void FillBuildTargetFromCache(string unity_metadata_root, BuildTarget build_target)
 		{
-			string uc_cache_root = Path.Combine(Application.dataPath, "../UniCacheData/" + build_target.ToString());
-			uc_cache_root = Path.GetFullPath(uc_cache_root);
+			UCDebug.Log(string.Format("Filling build target \"{0}\" from cache", build_target.ToString()));
 
+			string uc_cache_root = GetUCCacheRoot(build_target);
 			if(!Directory.Exists(uc_cache_root))
 			{
 				return;
@@ -205,7 +253,7 @@ namespace UniCache
 					if(File.GetLastWriteTimeUtc(real_asset_path) <= cached_asset.Value.LastWriteTimeUtc)
 					{
 						string cache_destination = Path.Combine(unity_metadata_root, cached_asset.Key);
-						UCDebug.Log(string.Format("Copying from {0} to {1}", cached_asset.Value.FullName, cache_destination));
+						UCDebug.Log(string.Format("Copying from {0} to {1} - Source: {2}", cached_asset.Value.FullName, cache_destination, asset_path));
 						cached_asset.Value.CopyTo(cache_destination, true);
 					}
 				}

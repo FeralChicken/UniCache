@@ -1,4 +1,4 @@
-﻿#define ENABLE_UNICACHE_LOGGING
+﻿//#define ENABLE_UNICACHE_LOGGING
 
 //------------------------------------------------------------------------------------
 public class UCDebug
