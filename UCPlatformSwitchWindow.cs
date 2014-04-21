@@ -1,6 +1,6 @@
 //-------------------------------------------------------------------------------------
 // UniCache - Fast Build Target switching for Unity3D
-// Copyright (c) 2014 FanDabbieDozie Studios
+// Author: Paul New (2014)
 //-------------------------------------------------------------------------------------
 
 using UnityEngine;
